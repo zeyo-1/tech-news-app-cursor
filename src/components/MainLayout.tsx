@@ -1,18 +1,17 @@
 'use client'
 
-import { Box, Container } from '@chakra-ui/react'
-import { ReactNode } from 'react'
-
 interface MainLayoutProps {
-  children: ReactNode
+  children: React.ReactNode
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <Box minH="100vh" bg="gray.50" _dark={{ bg: 'gray.900' }}>
-      <Container maxW="container.xl" py={4}>
-        {children}
-      </Container>
-    </Box>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <main className="py-6">
+        <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-8">
+          {children}
+        </div>
+      </main>
+    </div>
   )
 } 

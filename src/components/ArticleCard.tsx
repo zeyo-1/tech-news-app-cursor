@@ -1,65 +1,84 @@
-import { Box, Text, HStack, VStack, useColorModeValue } from '@chakra-ui/react'
+'use client'
+
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
+import { Article } from '@/lib/services/ScrapingService'
 
 interface ArticleCardProps {
-  title: string
-  url: string
-  summary?: string
-  sourceName: string
-  publishedAt?: Date
-  importance?: {
-    score: number
-  }
+  article: Article
+  onClick: (article: Article) => void
 }
 
-export function ArticleCard({ title, url, sourceName, publishedAt, importance }: ArticleCardProps) {
-  const borderColor = useColorModeValue('gray.100', 'gray.700')
-  const textColor = useColorModeValue('gray.600', 'gray.300')
-  const hoverBg = useColorModeValue('gray.50', 'gray.700')
+function removeHtmlTags(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, '')
+    .replace(/&[^;]+;/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function ArticleCard({ article, onClick }: ArticleCardProps) {
+  const truncatedTitle = removeHtmlTags(article.title).slice(0, 30) + (article.title.length > 30 ? '...' : '')
+  const truncatedContent = article.content 
+    ? removeHtmlTags(article.content).slice(0, 200) + (article.content.length > 200 ? '...' : '')
+    : ''
+
+  const importanceScore = article.importance?.score || 0
+  const importanceColor = importanceScore >= 0.8 
+    ? 'bg-red-100 text-red-800' 
+    : importanceScore >= 0.5 
+      ? 'bg-orange-100 text-orange-800' 
+      : 'bg-gray-100 text-gray-800'
 
   return (
-    <Box
-      as="a"
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      borderBottom="1px"
-      borderColor={borderColor}
-      py={4}
-      transition="all 0.2s"
-      _hover={{
-        bg: hoverBg,
-        textDecoration: 'none'
-      }}
+    <article
+      onClick={() => onClick(article)}
+      className="
+        cursor-pointer
+        bg-white dark:bg-gray-900
+        rounded-2xl
+        p-6 mb-6
+        transition-all duration-300
+        shadow-lg
+        relative
+        hover:transform hover:-translate-y-1 hover:shadow-2xl
+        before:content-['']
+        before:absolute before:inset-0
+        before:rounded-2xl
+        before:bg-gradient-to-b before:from-white/15 before:to-transparent
+        before:opacity-0
+        hover:before:opacity-100
+        before:transition-opacity
+        dark:text-white
+      "
     >
-      <VStack align="stretch" spacing={2}>
-        <Text 
-          fontSize="md" 
-          fontWeight="medium"
-          color={useColorModeValue('gray.800', 'white')}
-          noOfLines={2}
-          lineHeight="tall"
-        >
-          {title}
-        </Text>
+      <div className="flex flex-col gap-4">
+        <h3 className="text-xl font-bold leading-tall tracking-tight text-gray-900 dark:text-white">
+          {truncatedTitle}
+        </h3>
+        
+        <p className="text-md leading-7 tracking-wide text-gray-600 dark:text-gray-300">
+          {truncatedContent}
+        </p>
 
-        <HStack justify="space-between" fontSize="sm" color={textColor}>
-          <HStack spacing={4}>
-            <Text>{sourceName}</Text>
-            {publishedAt && (
-              <Text>
-                {format(publishedAt, 'yyyy年MM月dd日 HH:mm', { locale: ja })}
-              </Text>
-            )}
-          </HStack>
-          {importance && (
-            <Text>
-              重要度: {Math.round(importance.score * 100)}%
-            </Text>
-          )}
-        </HStack>
-      </VStack>
-    </Box>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500 font-medium tracking-wide">
+            {article.publishedAt
+              ? format(new Date(article.publishedAt), 'yyyy/MM/dd', { locale: ja })
+              : '日付なし'}
+          </span>
+
+          <span className={`
+            px-4 py-1.5 
+            rounded-full 
+            text-sm font-medium 
+            tracking-wide
+            ${importanceColor}
+          `}>
+            重要度: {Math.round(importanceScore * 100)}%
+          </span>
+        </div>
+      </div>
+    </article>
   )
 } 

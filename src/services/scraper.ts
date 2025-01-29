@@ -79,16 +79,152 @@ async function scrapeGigazineArticle(url: string): Promise<{
   };
 }
 
-// DeepSeekを使用した要約生成
-async function generateSummary(text: string, language: string = 'ja'): Promise<string> {
-  try {
-    const processedText = preprocessText(text);
-    if (!processedText) {
-      console.log('Empty text after preprocessing, skipping summary generation');
-      return text.slice(0, 200) + '...';
-    }
+// カスタムエラークラスの定義
+class ScraperError extends Error {
+  constructor(message: string, public readonly code: string, public readonly details?: any) {
+    super(message);
+    this.name = 'ScraperError';
+  }
+}
 
-    const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
+// エラーコードの定義
+const ErrorCodes = {
+  FEED_FETCH_ERROR: 'FEED_FETCH_ERROR',
+  FEED_PARSE_ERROR: 'FEED_PARSE_ERROR',
+  SCRAPING_ERROR: 'SCRAPING_ERROR',
+  SUMMARY_ERROR: 'SUMMARY_ERROR',
+  API_ERROR: 'API_ERROR',
+  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
+  NETWORK_ERROR: 'NETWORK_ERROR'
+} as const;
+
+// リトライ処理のユーティリティ関数
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    baseDelay?: number;
+    maxDelay?: number;
+    operationName: string;
+  }
+): Promise<T> {
+  const {
+    maxRetries = 3,
+    baseDelay = 1000,
+    maxDelay = 10000,
+    operationName
+  } = options;
+
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw new ScraperError(
+          `Unknown error in ${operationName}`,
+          ErrorCodes.API_ERROR,
+          { originalError: error }
+        );
+      }
+
+      lastError = error;
+      
+      if (axios.isAxiosError(error)) {
+        // ネットワークエラーやタイムアウトの場合のみリトライ
+        if (!error.response || error.code === 'ECONNABORTED') {
+          const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+          console.warn(`${operationName} failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`, {
+            error: error.message,
+            status: error.response?.status,
+            code: error.code
+          });
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      // その他のエラーは即座に失敗
+      throw new ScraperError(
+        `${operationName} failed: ${error.message}`,
+        ErrorCodes.API_ERROR,
+        { originalError: error }
+      );
+    }
+  }
+  
+  if (lastError) {
+    throw new ScraperError(
+      `${operationName} failed after ${maxRetries} attempts`,
+      ErrorCodes.NETWORK_ERROR,
+      { lastError }
+    );
+  }
+
+  throw new ScraperError(
+    `${operationName} failed with unknown error`,
+    ErrorCodes.NETWORK_ERROR
+  );
+}
+
+// 記事の重複チェック用のユーティリティ関数
+function isSimilarArticle(article1: Article, article2: Article): boolean {
+  // タイトルの類似度チェック
+  const title1Words = new Set(article1.title.toLowerCase().split(/\s+/));
+  const title2Words = new Set(article2.title.toLowerCase().split(/\s+/));
+  const commonWords = new Set([...title1Words].filter(x => title2Words.has(x)));
+  const similarity = commonWords.size / Math.max(title1Words.size, title2Words.size);
+
+  // 公開日時の差分チェック（1時間以内なら重複の可能性が高い）
+  const timeDiff = Math.abs(
+    new Date(article1.published_at).getTime() - new Date(article2.published_at).getTime()
+  );
+  const isCloseInTime = timeDiff < 60 * 60 * 1000; // 1時間以内
+
+  return similarity > 0.7 || isCloseInTime;
+}
+
+// 要約生成のキュー管理
+const summaryQueue: { text: string; resolve: (summary: string) => void; }[] = [];
+let isProcessingSummaries = false;
+
+// 要約生成のキュー処理
+async function processSummaryQueue() {
+  if (isProcessingSummaries || summaryQueue.length === 0) return;
+  
+  isProcessingSummaries = true;
+  
+  try {
+    while (summaryQueue.length > 0) {
+      const item = summaryQueue.shift();
+      if (!item) break;
+      
+      try {
+        const summary = await generateSummaryWithRetry(item.text);
+        item.resolve(summary);
+      } catch (error) {
+        console.error('Error processing summary queue item:', error);
+        item.resolve(item.text.slice(0, 200) + '...');
+      }
+      
+      // 次の要約生成までの待機時間を5秒に設定
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  } finally {
+    isProcessingSummaries = false;
+  }
+}
+
+// 要約生成の実際の処理（リトライロジック含む）
+async function generateSummaryWithRetry(text: string): Promise<string> {
+  const processedText = preprocessText(text);
+  if (!processedText) {
+    return text.slice(0, 200) + '...';
+  }
+
+  return await withRetry(
+    () => axios.post('https://api.deepseek.com/v1/chat/completions', {
       model: "deepseek-chat",
       messages: [
         {
@@ -108,38 +244,48 @@ async function generateSummary(text: string, language: string = 'ja'): Promise<s
         'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      timeout: 20000, // タイムアウトを20秒に短縮
+      timeout: 10000, // タイムアウトを10秒に短縮
       maxBodyLength: 4000,
       maxContentLength: 4000
-    });
-
-    if (!response.data?.choices?.[0]?.message?.content) {
-      throw new Error('Invalid response format from DeepSeek API');
+    }).then(response => {
+      if (!response.data?.choices?.[0]?.message?.content) {
+        throw new ScraperError(
+          'Invalid response format from DeepSeek API',
+          ErrorCodes.API_ERROR
+        );
+      }
+      return response.data.choices[0].message.content;
+    }),
+    {
+      operationName: 'Generating summary',
+      maxRetries: 2,
+      baseDelay: 5000, // 初回リトライまでの待機時間を5秒に設定
+      maxDelay: 15000 // 最大待機時間を15秒に制限
     }
-
-    return response.data.choices[0].message.content;
-  } catch (error) {
-    console.error('Error in generateSummary:', error);
-    // エラー時は元のテキストの最初の200文字を返す
-    return text.slice(0, 200) + '...';
-  }
+  );
 }
 
-// 並列処理を制御するユーティリティ関数
-async function asyncPool(concurrency: number, iterable: any[], iteratorFn: (item: any) => Promise<any>) {
-  const ret = [];
-  const executing = new Set();
-  for (const item of iterable) {
-    const p = Promise.resolve().then(() => iteratorFn(item));
-    ret.push(p);
-    executing.add(p);
-    const clean = () => executing.delete(p);
-    p.then(clean).catch(clean);
-    if (executing.size >= concurrency) {
-      await Promise.race(executing);
-    }
-  }
-  return Promise.all(ret);
+// 要約生成のメイン関数（キューを使用）
+async function generateSummary(text: string): Promise<string> {
+  return new Promise((resolve) => {
+    summaryQueue.push({ text, resolve });
+    processSummaryQueue().catch(error => {
+      console.error('Error in summary queue processing:', error);
+    });
+  });
+}
+
+// エラーログの詳細化
+function logError(error: unknown, context: string): void {
+  const errorDetails = {
+    message: error instanceof Error ? error.message : String(error),
+    code: error instanceof ScraperError ? error.code : 'UNKNOWN_ERROR',
+    context,
+    timestamp: new Date().toISOString(),
+    details: error instanceof ScraperError ? error.details : undefined
+  };
+
+  console.error('Error occurred:', errorDetails);
 }
 
 // 記事の重複を防ぐためのキャッシュ
@@ -172,116 +318,33 @@ function cleanupCache(): void {
   }
 }
 
-// RSSフィードから記事を取得
+// RSSフィードから記事を取得（メイン関数）
 export async function fetchArticlesFromRSS(): Promise<Article[]> {
   processedUrls.clear();
   const articles: Article[] = [];
   const startTime = Date.now();
   
-  // 古いキャッシュをクリーンアップ
   cleanupCache();
   
   console.log('Starting to fetch RSS feeds...');
   const cachedArticlesCount = articleCache.size;
   
   try {
-    const feedResults = await Promise.allSettled(RSS_FEEDS.map(async (feed) => {
-      try {
-        console.log(`Fetching from ${feed.name}...`);
-        const response = await axios.get(feed.url, {
-          headers: {
-            'Accept-Charset': 'utf-8',
-            'Accept': 'application/xml, application/rss+xml, text/xml',
-            'User-Agent': 'Mozilla/5.0 (compatible; Tech News App/1.0;)'
-          },
-          timeout: 10000
-        });
+    const feedResults = await Promise.allSettled(
+      RSS_FEEDS.map(feed => fetchFeedSafely(feed))
+    );
 
-        if (!response.data) {
-          throw new Error(`Empty response from ${feed.name}`);
-        }
-
-        const feedContent = await parser.parseString(response.data);
-        if (!feedContent || !feedContent.items) {
-          throw new Error(`Invalid feed content from ${feed.name}`);
-        }
-
-        const latestItems = feedContent.items
-          .slice(0, 2)
-          .filter(item => item && item.link && !processedUrls.has(item.link));
-
-        const processedItems = await asyncPool(1, latestItems, async (item) => {
-          if (!item.link || processedUrls.has(item.link)) {
-            return null;
-          }
-
-          // キャッシュをチェック
-          const cachedEntry = articleCache.get(item.link);
-          if (cachedEntry && isValidCache(cachedEntry)) {
-            processedUrls.add(item.link);
-            console.log(`Cache hit for article: ${item.title?.slice(0, 30)}...`);
-            return cachedEntry.data;
-          }
-
-          console.log(`Processing new article: ${item.title?.slice(0, 30)}...`);
-          processedUrls.add(item.link);
-          let articleData: Article = {
-            title: item.title?.trim() || '',
-            url: item.link,
-            source_name: feed.name,
-            published_at: item.pubDate || item.isoDate || new Date().toISOString(),
-            content: (item.content || item.contentSnippet || '').trim(),
-            image_url: item.mediaContent?.[0]?.$.url || 
-                      item.mediaThumbnail?.[0]?.$.url ||
-                      item.enclosure?.url || null,
-            summary: ''
-          };
-
-          if (feed.allowsScraping && feed.name === 'GIGAZINE' && item.link) {
-            try {
-              const scrapedData = await scrapeGigazineArticle(item.link);
-              articleData = {
-                ...articleData,
-                content: scrapedData.content || articleData.content,
-                title: scrapedData.title || articleData.title,
-                image_url: scrapedData.image_url || articleData.image_url,
-                published_at: scrapedData.published_at || articleData.published_at
-              };
-            } catch (error) {
-              console.error(`Error scraping GIGAZINE article: ${item.link}`, error);
-            }
-          }
-
-          if (articleData.content) {
-            articleData.summary = await generateSummary(articleData.content);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          } else {
-            articleData.summary = articleData.title;
-          }
-
-          // キャッシュに保存
-          articleCache.set(item.link, {
-            data: articleData,
-            timestamp: Date.now()
-          });
-
-          return articleData;
-        });
-
-        return processedItems.filter(Boolean);
-      } catch (error) {
-        console.error(`Error processing feed ${feed.name}:`, error);
-        return [];
-      }
-    }));
-
-    feedResults.forEach(result => {
-      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+    for (const result of feedResults) {
+      if (result.status === 'fulfilled') {
+        // 各フィードの記事を処理する前に3秒待機
+        await new Promise(resolve => setTimeout(resolve, 3000));
         articles.push(...result.value);
+      } else {
+        logError(result.reason, `Failed to process feed`);
       }
-    });
+    }
 
-    // 重要度でソート
+    // 記事を重要度スコアでソート
     articles.sort((a, b) => {
       const scoreA = calculateImportanceScore(a.content, a.title);
       const scoreB = calculateImportanceScore(b.content, b.title);
@@ -294,7 +357,7 @@ export async function fetchArticlesFromRSS(): Promise<Article[]> {
     console.log(`Successfully fetched ${articles.length} articles (${cachedArticlesCount} from cache) in ${processingTime.toFixed(2)}s`);
     return articles;
   } catch (error) {
-    console.error('Error in fetchArticlesFromRSS:', error);
+    logError(error, 'Error in fetchArticlesFromRSS');
     return [];
   }
 }
@@ -360,4 +423,108 @@ function assessTitleQuality(title: string): number {
   };
 
   return Object.values(factors).reduce((sum, score) => sum + score, 0);
+}
+
+// RSSフィードの取得を安全に行う（並列処理の制御を改善）
+async function fetchFeedSafely(feed: typeof RSS_FEEDS[0]): Promise<Article[]> {
+  try {
+    const response = await withRetry(
+      () => axios.get(feed.url, {
+        headers: {
+          'Accept-Charset': 'utf-8',
+          'Accept': 'application/xml, application/rss+xml, text/xml',
+          'User-Agent': 'Mozilla/5.0 (compatible; Tech News App/1.0;)'
+        },
+        timeout: 10000
+      }),
+      { 
+        operationName: `Fetching ${feed.name} feed`,
+        maxRetries: 2,
+        baseDelay: 3000
+      }
+    );
+
+    if (!response.data) {
+      throw new ScraperError(
+        `Empty response from ${feed.name}`,
+        ErrorCodes.FEED_FETCH_ERROR
+      );
+    }
+
+    const feedContent = await parser.parseString(response.data);
+    if (!feedContent || !feedContent.items) {
+      throw new ScraperError(
+        `Invalid feed content from ${feed.name}`,
+        ErrorCodes.FEED_PARSE_ERROR
+      );
+    }
+
+    const articles: Article[] = [];
+    // 同時に処理する記事数を制限
+    const itemsToProcess = feedContent.items.slice(0, 3);
+    
+    for (const item of itemsToProcess) {
+      if (!item.link || processedUrls.has(item.link)) continue;
+
+      const cachedEntry = articleCache.get(item.link);
+      if (cachedEntry && isValidCache(cachedEntry)) {
+        processedUrls.add(item.link);
+        if (!articles.some(article => isSimilarArticle(article, cachedEntry.data))) {
+          articles.push(cachedEntry.data);
+        }
+        continue;
+      }
+
+      processedUrls.add(item.link);
+      let articleData: Article = {
+        title: item.title?.trim() || '',
+        url: item.link,
+        source_name: feed.name,
+        published_at: item.pubDate || item.isoDate || new Date().toISOString(),
+        content: (item.content || item.contentSnippet || '').trim(),
+        image_url: item.mediaContent?.[0]?.$.url || 
+                  item.mediaThumbnail?.[0]?.$.url ||
+                  item.enclosure?.url || null,
+        summary: ''
+      };
+
+      if (feed.allowsScraping && feed.name === 'GIGAZINE' && item.link) {
+        try {
+          const scrapedData = await scrapeGigazineArticle(item.link);
+          articleData = {
+            ...articleData,
+            content: scrapedData.content || articleData.content,
+            title: scrapedData.title || articleData.title,
+            image_url: scrapedData.image_url || articleData.image_url,
+            published_at: scrapedData.published_at || articleData.published_at
+          };
+        } catch (error) {
+          console.error(`Error scraping GIGAZINE article: ${item.link}`, error);
+        }
+      }
+
+      if (articleData.content) {
+        articleData.summary = await generateSummary(articleData.content);
+      } else {
+        articleData.summary = articleData.title;
+      }
+
+      if (!articles.some(article => isSimilarArticle(article, articleData))) {
+        articles.push(articleData);
+        articleCache.set(item.link, {
+          data: articleData,
+          timestamp: Date.now()
+        });
+      }
+    }
+
+    return articles;
+  } catch (error) {
+    if (error instanceof ScraperError) throw error;
+    throw new ScraperError(
+      `Unexpected error fetching ${feed.name} feed: ${(error as Error).message}`,
+      ErrorCodes.FEED_FETCH_ERROR,
+      { originalError: error }
+    );
+  }
 } 

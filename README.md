@@ -11,9 +11,14 @@
 - 記事の重要度に基づく自動ソート
 
 ## 技術スタック
+### フロントエンド
 - Next.js 15.1.5
 - TypeScript
 - Tailwind CSS
+- shadcn/ui（UIコンポーネント）
+- framer-motion（アニメーション）
+
+### バックエンド
 - DeepSeek API（要約生成）
 - RSS Parser
 - Axios
@@ -56,6 +61,9 @@ npm run dev
 
 ## 今後の予定
 - [ ] フロントエンドUIの実装
+  - [ ] モダンなUIコンポーネント（shadcn/ui）
+  - [ ] スムーズなアニメーション（framer-motion）
+  - [ ] レスポンシブデザイン
 - [ ] 記事のカテゴリー分類機能
 - [ ] ユーザー認証システム
 - [ ] お気に入り機能

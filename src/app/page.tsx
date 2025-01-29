@@ -1,15 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Box, SimpleGrid, Spinner, Text, Center, Alert, AlertIcon } from '@chakra-ui/react'
 import { MainLayout } from '@/components/MainLayout'
 import { ArticleCard } from '@/components/ArticleCard'
+import { ArticleModal } from '@/components/ArticleModal'
 import { Article } from '@/lib/services/ScrapingService'
+import { SortControl, SortOption } from '@/components/SortControl'
 
 export default function Home() {
   const [articles, setArticles] = useState<Article[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc')
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     const fetchArticles = async () => {
@@ -34,6 +39,33 @@ export default function Home() {
     fetchArticles()
   }, [])
 
+  const sortedArticles = useMemo(() => {
+    return [...articles].sort((a, b) => {
+      switch (sortOption) {
+        case 'date-desc':
+          return new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime()
+        case 'date-asc':
+          return new Date(a.publishedAt || 0).getTime() - new Date(b.publishedAt || 0).getTime()
+        case 'importance':
+          return (b.importance?.score || 0) - (a.importance?.score || 0)
+        case 'source':
+          return a.sourceName.localeCompare(b.sourceName)
+        default:
+          return 0
+      }
+    })
+  }, [articles, sortOption])
+
+  const handleArticleClick = (article: Article) => {
+    setSelectedArticle(article)
+    setIsModalOpen(true)
+  }
+
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    setSelectedArticle(null)
+  }
+
   return (
     <MainLayout>
       {isLoading ? (
@@ -53,19 +85,23 @@ export default function Home() {
         </Center>
       ) : (
         <Box py={4}>
+          <SortControl value={sortOption} onChange={setSortOption} />
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={6}>
-            {articles.map(article => (
+            {sortedArticles.map(article => (
               <ArticleCard
                 key={article.url}
-                title={article.title}
-                url={article.url}
-                summary={article.content}
-                sourceName={article.sourceName}
-                publishedAt={article.publishedAt ? new Date(article.publishedAt) : undefined}
-                importance={article.importance}
+                article={article}
+                onClick={handleArticleClick}
               />
             ))}
           </SimpleGrid>
+          {selectedArticle && (
+            <ArticleModal
+              article={selectedArticle}
+              isOpen={isModalOpen}
+              onClose={handleModalClose}
+            />
+          )}
         </Box>
       )}
     </MainLayout>

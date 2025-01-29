@@ -1,48 +1,26 @@
-export type Article = {
-  // 基本情報
+export interface Article {
   id: string;
+  url: string;
   title: string;
-  slug: string;
-  content: string;
+  content?: string;
   summary?: string;
-  author?: string;
+  source_name: string;
+  image_url?: string;
   
-  // メディア関連
-  thumbnailUrl?: string;
-  imageUrl?: string;
-  
-  // 分類・管理
+  // メタデータ
+  published_at?: string;
+  importance_score?: number;
   category?: string;
-  tags?: string[];
   language: string;
-  status: 'draft' | 'published' | 'archived';
-  version: number;
-  readingTime?: number;
   
-  // 表示制御
-  featured: boolean;
-  pinned: boolean;
+  // スクレイピング管理
+  last_scraped_at: string;
+  scraping_frequency?: string;
+  error_count: number;
+  last_error?: string;
   
-  // SEO・メタデータ
-  metaTitle?: string;
-  metaDescription?: string;
-  
-  // ソース情報
-  sourceName?: string;
-  sourceUrl?: string;
-  sourceLogoUrl?: string;
-  
-  // エンゲージメント
-  viewCount: number;
-  likeCount: number;
-  commentCount: number;
-  
-  // 関連記事
-  relatedArticleIds?: string[];
-  
-  // タイムスタンプ
-  publishedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt?: Date;
-}; 
+  // 監査情報
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+} 

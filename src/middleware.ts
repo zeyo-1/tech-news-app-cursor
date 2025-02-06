@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // 認証が不要なパブリックルート
-const publicRoutes = ['/auth/login', '/auth/signup', '/auth/callback'];
+const publicRoutes = ['/auth/login', '/auth/signup', '/auth/callback', '/api/test-rss'];
 
 // 認証済みユーザーがアクセスできないルート（認証ページなど）
 const authRoutes = ['/auth/login', '/auth/signup'];

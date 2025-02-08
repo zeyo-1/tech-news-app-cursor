@@ -63,11 +63,11 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <div className="flex-1 flex items-center px-4 min-w-0">
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <span className="text-xl font-bold">Buzz Tech</span>
+            <span className="text-xl font-bold">Buzz Tech Now</span>
           </Link>
 
           <div className="flex flex-1 items-center gap-4 min-w-0 ml-8">
-            <div className="w-full max-w-[600px] mx-auto" ref={searchRef}>
+            <div className="w-full max-w-[580px] mx-auto" ref={searchRef}>
               <div className="relative">
                 <Input
                   type="search"
@@ -90,7 +90,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   type="submit"
                   size="icon"
                   variant="ghost"
-                  className="absolute right-1 top-1 h-7 w-7 hover:bg-accent"
+                  className="absolute right-1 top-1 h-7 w-8 hover:bg-accent/50"
                   onClick={() => handleSearch(searchQuery)}
                 >
                   <Search className="h-4 w-4" />

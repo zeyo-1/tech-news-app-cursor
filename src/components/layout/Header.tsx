@@ -64,7 +64,10 @@ export function Header({ onMenuClick }: HeaderProps) {
 
           <div className="flex-1 flex items-center px-4 min-w-0 max-w-[1720px] mx-auto">
             <Link href="/" className="flex items-center gap-2 shrink-0">
-              <span className="text-xl font-bold">Buzz Tech Now</span>
+              <span className="text-xl font-bold">
+                <span className="hidden md:inline">Buzz Tech Now</span>
+                <span className="md:hidden">BTN</span>
+              </span>
             </Link>
 
             <div className="flex flex-1 items-center gap-4 min-w-0 ml-8">

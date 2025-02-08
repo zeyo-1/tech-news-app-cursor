@@ -202,69 +202,32 @@ export default function Home() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-4">
-        <h1 className="text-4xl font-bold">Buzz Tech Now</h1>
-        <p className="text-muted-foreground">
-          最新のテクノロジーニュースをAIが要約してお届けします
-        </p>
-      </div>
-      
-      <div className="flex flex-col gap-4">
-        <SearchBar onSearch={handleSearch} />
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <MobileFilters
-              selectedCategory={selectedCategory}
-              selectedSort={selectedSort}
-              selectedTags={selectedTags}
-              onCategoryChange={handleCategoryChange}
-              onSortChange={handleSortChange}
-              onTagChange={handleTagChange}
-            />
-            <CategoryFilter
-              selectedCategory={selectedCategory}
-              onCategoryChange={handleCategoryChange}
-              className="hidden sm:flex"
-            />
-          </div>
-          <div className="hidden sm:flex flex-col gap-4">
-            <TagFilter
-              selectedTags={selectedTags}
-              onTagChange={handleTagChange}
-            />
-            <SortFilter
-              selectedSort={selectedSort}
-              onSortChange={handleSortChange}
-            />
-          </div>
+      <div className="space-y-6">
+        <div className="flex flex-wrap gap-4">
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            onCategoryChange={handleCategoryChange}
+          />
+          <SortFilter
+            selectedSort={selectedSort}
+            onSortChange={handleSortChange}
+          />
         </div>
-      </div>
-      
-      {filteredAndSortedArticles.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">
-            {searchQuery ? '検索条件に一致する記事が見つかりませんでした。' : '記事が見つかりませんでした。'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {paginatedArticles.map((article) => (
-              <ArticleCard key={article.url} article={article} />
-            ))}
-          </div>
 
-          {totalPages > 1 && (
-            <div className="mt-8 flex justify-center">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
-            </div>
-          )}
-        </>
-      )}
+        <TagFilter
+          selectedTags={selectedTags}
+          onTagChange={handleTagChange}
+        />
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((article) => (
+            <ArticleCard
+              key={article.url}
+              article={article}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 } 

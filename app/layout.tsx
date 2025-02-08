@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { RootLayoutClient } from '@/components/layout/RootLayoutClient'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Tech News App',
-  description: 'テクノロジー関連のニュースを自動収集し、AIによる要約を提供するWebアプリケーション',
+  title: 'Buzz Tech Now',
+  description: '最新のテクノロジーニュースをAIが要約してお届けします',
 }
 
 export default function RootLayout({
@@ -17,11 +18,7 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body className={inter.className}>
-        <div className="min-h-screen bg-background">
-          <main className="container mx-auto py-8">
-            {children}
-          </main>
-        </div>
+        <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>
   )

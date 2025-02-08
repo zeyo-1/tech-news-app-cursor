@@ -1,26 +1,24 @@
 export interface Article {
-  id: string;
-  url: string;
+  id?: string;
   title: string;
+  url: string;
   content?: string;
-  summary?: string;
+  summary: string;
   source_name: string;
   image_url?: string;
-  
-  // メタデータ
-  published_at?: string;
-  importance_score?: number;
+  published_at: string;
+  importance?: {
+    score: number;
+  };
   category?: string;
   language: string;
+  view_count?: number;
+  engagement_score?: number;
+  tags?: string[];
+  thumbnail: string;
   
-  // スクレイピング管理
-  last_scraped_at: string;
-  scraping_frequency?: string;
-  error_count: number;
-  last_error?: string;
-  
-  // 監査情報
-  created_at: string;
-  updated_at: string;
+  // メタデータ
+  created_at?: string;
+  updated_at?: string;
   deleted_at?: string;
 } 

@@ -1,12 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { Menu, Search, Sun, Moon, Bell, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useTheme } from 'next-themes'
 import { useSupabase } from '@/providers/SupabaseProvider'
+import { useRouter } from 'next/navigation'
+import { useSearchHistory } from '@/hooks/useSearchHistory'
+import { SearchSuggestions } from '@/components/SearchSuggestions'
+import { useClickAway } from '@/hooks/useClickAway'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -15,7 +19,32 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { theme, setTheme } = useTheme()
   const { user } = useSupabase()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const { searchHistory, addToHistory } = useSearchHistory()
+  const searchRef = useRef<HTMLDivElement>(null)
+
+  // トレンドキーワードの例（実際にはAPIから取得するなど）
+  const trendingSearches = [
+    'ChatGPT-5',
+    'Next.js 14',
+    'React Server Components',
+    'AI開発',
+    'TypeScript 5.4'
+  ]
+
+  useClickAway(searchRef, () => {
+    setShowSuggestions(false)
+  })
+
+  const handleSearch = (query: string) => {
+    if (!query.trim()) return
+    addToHistory(query)
+    setSearchQuery(query)
+    setShowSuggestions(false)
+    router.push(`/search?q=${encodeURIComponent(query)}`)
+  }
 
   return (
     <header className="fixed top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -37,16 +66,38 @@ export function Header({ onMenuClick }: HeaderProps) {
             <span className="text-xl font-bold">Buzz Tech</span>
           </Link>
 
-          <div className="flex flex-1 items-center justify-end gap-4 min-w-0">
-            <div className="w-full max-w-[600px]">
+          <div className="flex flex-1 items-center gap-4 min-w-0 ml-8">
+            <div className="w-full max-w-[600px] mx-auto" ref={searchRef}>
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="記事を検索..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-muted pl-8 focus-visible:ring-1"
+                  onFocus={() => setShowSuggestions(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearch(searchQuery)
+                    }
+                  }}
+                  className="w-full bg-muted pr-12 focus-visible:ring-1"
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-1 top-1 h-7 w-7 hover:bg-accent"
+                  onClick={() => handleSearch(searchQuery)}
+                >
+                  <Search className="h-4 w-4" />
+                  <span className="sr-only">検索</span>
+                </Button>
+                <SearchSuggestions
+                  query={searchQuery}
+                  recentSearches={searchHistory}
+                  trendingSearches={trendingSearches}
+                  onSelect={handleSearch}
+                  visible={showSuggestions}
                 />
               </div>
             </div>

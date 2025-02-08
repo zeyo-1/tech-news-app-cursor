@@ -1,43 +1,41 @@
 'use client';
 
+import { Button } from "@/components/ui/button";
+import { Clock, TrendingUp, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
+
 export type SortOption = 'latest' | 'popular' | 'trending';
 
 const SORT_OPTIONS = [
-  { id: 'latest', name: '最新順', icon: '🕒' },
-  { id: 'popular', name: '人気順', icon: '👁' },
-  { id: 'trending', name: '注目順', icon: '❤️' }
+  { id: 'latest', name: '最新順', icon: Clock },
+  { id: 'popular', name: '人気順', icon: Star },
+  { id: 'trending', name: '注目順', icon: TrendingUp }
 ] as const;
 
-type SortFilterProps = {
-  selectedSort: SortOption;
-  onSortChange: (sort: SortOption) => void;
-};
+interface SortFilterProps {
+  value: SortOption;
+  onValueChange: (value: SortOption) => void;
+  className?: string;
+}
 
-export default function SortFilter({
-  selectedSort,
-  onSortChange
-}: SortFilterProps) {
+export function SortFilter({ value, onValueChange, className }: SortFilterProps) {
   return (
-    <div className="flex items-center space-x-2 mb-6">
-      <span className="text-sm text-gray-500">並び替え:</span>
-      <div className="flex space-x-1">
-        {SORT_OPTIONS.map((option) => (
-          <button
+    <div className={cn('flex gap-2', className)}>
+      {SORT_OPTIONS.map((option) => {
+        const Icon = option.icon;
+        return (
+          <Button
             key={option.id}
-            onClick={() => onSortChange(option.id)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-              flex items-center space-x-1
-              ${
-                selectedSort === option.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+            variant={value === option.id ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onValueChange(option.id as SortOption)}
+            className="flex items-center gap-2"
           >
-            <span>{option.icon}</span>
-            <span>{option.name}</span>
-          </button>
-        ))}
-      </div>
+            <Icon className="h-4 w-4" />
+            {option.name}
+          </Button>
+        );
+      })}
     </div>
   );
 } 

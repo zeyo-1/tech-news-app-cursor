@@ -75,7 +75,11 @@ export function Header({ onMenuClick }: HeaderProps) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setShowSuggestions(true)}
-                  onKeyDown={(e) => {
+                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement> & { isComposing: boolean }) => {
+                    // IME入力中（変換中）のEnterキーは無視
+                    if (e.isComposing || e.keyCode === 229) {
+                      return
+                    }
                     if (e.key === 'Enter') {
                       handleSearch(searchQuery)
                     }

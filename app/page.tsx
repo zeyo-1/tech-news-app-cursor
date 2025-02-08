@@ -11,7 +11,7 @@ import type { SortOption } from '@/components/SortFilter'
 import { ArticleSkeletonGrid } from '@/components/ArticleSkeleton'
 import { ErrorMessage } from '@/components/ErrorMessage'
 import { MobileFilters } from '@/components/MobileFilters'
-import { TagFilter, type Tag } from '@/components/TagFilter'
+import { TagFilter } from '@/components/TagFilter'
 
 async function getArticles(): Promise<Article[]> {
   try {
@@ -154,13 +154,6 @@ export default function Home() {
   if (loading) {
     return (
       <div className="space-y-8">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-bold">Buzz Tech Now</h1>
-          <p className="text-muted-foreground">
-            最新のテクノロジーニュースをAIが要約してお届けします
-          </p>
-        </div>
-        
         <div className="flex flex-col gap-4">
           <div className="h-10 w-full animate-pulse rounded-lg bg-muted" />
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -185,13 +178,6 @@ export default function Home() {
   if (error) {
     return (
       <div className="space-y-8">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-bold">Buzz Tech Now</h1>
-          <p className="text-muted-foreground">
-            最新のテクノロジーニュースをAIが要約してお届けします
-          </p>
-        </div>
-
         <ErrorMessage
           message={error}
           onRetry={fetchArticles}

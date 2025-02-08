@@ -70,13 +70,6 @@ export default function Home() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-4">
-        <h1 className="text-4xl font-bold">Buzz Tech Now</h1>
-        <p className="text-muted-foreground">
-          最新のテクノロジーニュースをAIが要約してお届けします
-        </p>
-      </div>
-
       <div className="space-y-6">
         <CategoryFilter
           selectedCategory={selectedCategory}

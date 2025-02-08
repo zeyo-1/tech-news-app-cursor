@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
 import { SupabaseProvider } from '@/providers/SupabaseProvider';
 import { Toaster } from '@/components/ui/toaster';
 import { RootLayoutClient } from '@/components/layout/RootLayoutClient';
@@ -22,10 +21,7 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <SupabaseProvider>
-          <Navbar />
-          <main className="container mx-auto px-4 py-8">
-            <RootLayoutClient>{children}</RootLayoutClient>
-          </main>
+          <RootLayoutClient>{children}</RootLayoutClient>
         </SupabaseProvider>
         <Toaster />
       </body>

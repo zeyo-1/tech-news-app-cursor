@@ -27,6 +27,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import {
@@ -37,6 +46,8 @@ import {
 } from 'lucide-react';
 import { Article } from '@/types/article';
 
+const ITEMS_PER_PAGE = 10;
+
 export default function ArticlesPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +56,8 @@ export default function ArticlesPage() {
   const [sortField, setSortField] = useState<string>('published_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [categories, setCategories] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const supabase = createClientComponentClient();
 
@@ -52,17 +65,35 @@ export default function ArticlesPage() {
   const fetchArticles = async () => {
     setIsLoading(true);
     try {
+      // 総件数の取得
+      let countQuery = supabase
+        .from('articles')
+        .select('*', { count: 'exact', head: true });
+
+      if (searchQuery) {
+        countQuery = countQuery.or(`title.ilike.%${searchQuery}%,summary.ilike.%${searchQuery}%`);
+      }
+
+      if (selectedCategory !== 'all') {
+        countQuery = countQuery.eq('category', selectedCategory);
+      }
+
+      const { count, error: countError } = await countQuery;
+      
+      if (countError) throw countError;
+      setTotalCount(count || 0);
+
+      // 記事データの取得
       let query = supabase
         .from('articles')
         .select('*')
-        .order(sortField, { ascending: sortOrder === 'asc' });
+        .order(sortField, { ascending: sortOrder === 'asc' })
+        .range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1);
 
-      // 検索クエリがある場合
       if (searchQuery) {
         query = query.or(`title.ilike.%${searchQuery}%,summary.ilike.%${searchQuery}%`);
       }
 
-      // カテゴリーが選択されている場合
       if (selectedCategory !== 'all') {
         query = query.eq('category', selectedCategory);
       }
@@ -128,9 +159,35 @@ export default function ArticlesPage() {
     }
   };
 
+  // ページ変更時の処理
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   useEffect(() => {
     fetchArticles();
-  }, [searchQuery, selectedCategory, sortField, sortOrder]);
+  }, [searchQuery, selectedCategory, sortField, sortOrder, currentPage]);
+
+  // 総ページ数の計算
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+  // ページネーションの表示範囲を計算
+  const getPageRange = () => {
+    const range: number[] = [];
+    const maxVisiblePages = 5;
+    let start = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let end = Math.min(totalPages, start + maxVisiblePages - 1);
+
+    if (end - start + 1 < maxVisiblePages) {
+      start = Math.max(1, end - maxVisiblePages + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      range.push(i);
+    }
+
+    return range;
+  };
 
   return (
     <div className="space-y-4 p-8">
@@ -147,13 +204,19 @@ export default function ArticlesPage() {
           <Input
             placeholder="記事を検索..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1); // 検索時はページを1に戻す
+            }}
             className="max-w-sm"
           />
         </div>
         <Select
           value={selectedCategory}
-          onValueChange={setSelectedCategory}
+          onValueChange={(value) => {
+            setSelectedCategory(value);
+            setCurrentPage(1); // カテゴリー変更時はページを1に戻す
+          }}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="カテゴリー" />
@@ -272,6 +335,46 @@ export default function ArticlesPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* ページネーション */}
+      {!isLoading && articles.length > 0 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              />
+            </PaginationItem>
+            
+            {getPageRange().map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  onClick={() => handlePageChange(page)}
+                  isActive={page === currentPage}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+
+      {/* 総件数の表示 */}
+      {!isLoading && (
+        <div className="text-sm text-muted-foreground text-center">
+          全{totalCount}件中 {(currentPage - 1) * ITEMS_PER_PAGE + 1}～
+          {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}件を表示
+        </div>
+      )}
     </div>
   );
 } 

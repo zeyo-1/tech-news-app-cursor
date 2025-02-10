@@ -45,6 +45,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Article } from '@/types/article';
+import { ArticleDetailModal } from '@/components/admin/ArticleDetailModal';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -58,6 +59,7 @@ export default function ArticlesPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 
   const supabase = createClientComponentClient();
 
@@ -283,7 +285,15 @@ export default function ArticlesPage() {
             ) : (
               articles.map((article) => (
                 <TableRow key={article.id}>
-                  <TableCell className="font-medium">{article.title}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 font-medium"
+                      onClick={() => setSelectedArticle(article)}
+                    >
+                      {article.title}
+                    </Button>
+                  </TableCell>
                   <TableCell>{article.category || '-'}</TableCell>
                   <TableCell>
                     {format(new Date(article.published_at), 'yyyy/MM/dd HH:mm', { locale: ja })}
@@ -375,6 +385,12 @@ export default function ArticlesPage() {
           {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}件を表示
         </div>
       )}
+
+      <ArticleDetailModal
+        article={selectedArticle}
+        isOpen={!!selectedArticle}
+        onClose={() => setSelectedArticle(null)}
+      />
     </div>
   );
 } 

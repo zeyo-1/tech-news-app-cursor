@@ -11,6 +11,8 @@ import {
   Bell,
   Settings,
   Home,
+  ScrollText,
+  PlaySquare,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -27,6 +29,8 @@ const navigation = [
   { name: '分析', href: '/admin/analytics', icon: BarChart, shortLabel: '分析' },
   { name: '通知設定', href: '/admin/notifications', icon: Bell, shortLabel: '通知' },
   { name: 'システム設定', href: '/admin/settings', icon: Settings, shortLabel: '設定' },
+  { name: 'ログ管理', href: '/admin/logs', icon: ScrollText, shortLabel: 'ログ' },
+  { name: 'バッチ管理', href: '/admin/batch', icon: PlaySquare, shortLabel: 'バッチ' },
 ];
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {

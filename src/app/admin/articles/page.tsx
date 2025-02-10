@@ -43,9 +43,15 @@ import {
   ArrowUpDown,
   ChevronDown,
   RefreshCw,
+  Check,
+  Loader2,
+  Trash2,
+  ChevronUp,
 } from 'lucide-react';
 import { Article } from '@/types/article';
 import { ArticleDetailModal } from '@/components/admin/ArticleDetailModal';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -60,6 +66,8 @@ export default function ArticlesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const supabase = createClientComponentClient();
 
@@ -112,6 +120,7 @@ export default function ArticlesPage() {
       setCategories(uniqueCategories as string[]);
     } catch (error) {
       console.error('Error fetching articles:', error);
+      setError('記事の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -135,11 +144,11 @@ export default function ArticlesPage() {
   };
 
   // 記事の公開/非公開切り替え
-  const handleTogglePublish = async (id: string, currentStatus: boolean) => {
+  const handleTogglePublish = async (id: string, currentStatus: string) => {
     try {
       const { error } = await supabase
         .from('articles')
-        .update({ is_published: !currentStatus })
+        .update({ status: currentStatus === 'published' ? 'draft' : 'published' })
         .eq('id', id);
 
       if (error) throw error;
@@ -166,6 +175,43 @@ export default function ArticlesPage() {
     setCurrentPage(page);
   };
 
+  // 一括操作の処理
+  const handleBulkAction = async (action: 'publish' | 'unpublish' | 'delete') => {
+    if (selectedIds.length === 0) return;
+
+    try {
+      const response = await fetch('/api/admin/articles/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action,
+          articleIds: selectedIds,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to perform bulk action');
+      }
+
+      await fetchArticles();
+      setSelectedIds([]);
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+      setError('一括操作に失敗しました');
+    }
+  };
+
+  // 全選択の処理
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedIds(articles.map(article => article.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
   useEffect(() => {
     fetchArticles();
   }, [searchQuery, selectedCategory, sortField, sortOrder, currentPage]);
@@ -190,6 +236,22 @@ export default function ArticlesPage() {
 
     return range;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[200px] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[200px] items-center justify-center text-destructive">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 p-8">
@@ -234,10 +296,44 @@ export default function ArticlesPage() {
         </Select>
       </div>
 
+      <div className="flex items-center justify-between">
+        {selectedIds.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                一括操作
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleBulkAction('publish')}>
+                公開する
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleBulkAction('unpublish')}>
+                非公開にする
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleBulkAction('delete')}
+                className="text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                削除する
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={selectedIds.length === articles.length}
+                  onCheckedChange={handleSelectAll}
+                />
+              </TableHead>
               <TableHead className="w-[400px]">
                 <Button
                   variant="ghost"
@@ -286,6 +382,18 @@ export default function ArticlesPage() {
               articles.map((article) => (
                 <TableRow key={article.id}>
                   <TableCell>
+                    <Checkbox
+                      checked={selectedIds.includes(article.id)}
+                      onCheckedChange={(checked: boolean | 'indeterminate') => {
+                        if (checked === true) {
+                          setSelectedIds([...selectedIds, article.id]);
+                        } else {
+                          setSelectedIds(selectedIds.filter(id => id !== article.id));
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
                     <Button
                       variant="link"
                       className="h-auto p-0 font-medium"
@@ -301,12 +409,12 @@ export default function ArticlesPage() {
                   <TableCell>
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        article.is_published
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
+                        article.status === 'published'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                       }`}
                     >
-                      {article.is_published ? '公開中' : '非公開'}
+                      {article.status === 'published' ? '公開中' : '下書き'}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
@@ -325,9 +433,9 @@ export default function ArticlesPage() {
                           元記事を表示
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => handleTogglePublish(article.id!, article.is_published!)}
+                          onClick={() => handleTogglePublish(article.id!, article.status)}
                         >
-                          {article.is_published ? '非公開にする' : '公開する'}
+                          {article.status === 'published' ? '下書きにする' : '公開する'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -390,6 +498,7 @@ export default function ArticlesPage() {
         article={selectedArticle}
         isOpen={!!selectedArticle}
         onClose={() => setSelectedArticle(null)}
+        onUpdate={fetchArticles}
       />
     </div>
   );

@@ -1,0 +1,56 @@
+INSERT INTO articles (
+  title,
+  summary,
+  content,
+  category,
+  status,
+  source_url,
+  source_name,
+  published_at,
+  created_at,
+  updated_at,
+  slug,
+  language
+) VALUES 
+(
+  'AIの進化が加速：新しい言語モデルの登場',
+  '最新の言語モデルが従来の性能を大幅に上回る結果を示し、AI研究の新たな breakthrough となっています。',
+  '詳細な内容をここに記述します。新しい言語モデルの特徴や、具体的な性能向上の詳細について...',
+  'AI',
+  'published',
+  'https://example.com/ai-news',
+  'AI News',
+  '2024-03-20T10:00:00Z',
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP,
+  'ai-evolution-new-language-model',
+  'ja'
+),
+(
+  'Web開発の未来：新フレームワークの台頭',
+  'フロントエンド開発の新しいパラダイムを提案する革新的なフレームワークが注目を集めています。',
+  'フレームワークの特徴、利点、従来の手法との比較など...',
+  'Web Development',
+  'draft',
+  'https://example.com/web-dev',
+  'Web Dev News',
+  '2024-03-19T15:30:00Z',
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP,
+  'future-of-web-development',
+  'ja'
+),
+(
+  'クラウドセキュリティの最新トレンド',
+  '増加するサイバー攻撃に対応する新しいセキュリティ対策手法について解説します。',
+  'クラウドセキュリティの現状、新しい脅威、対策手法の詳細について...',
+  'Security',
+  'published',
+  'https://example.com/security',
+  'Security News',
+  '2024-03-18T09:15:00Z',
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP,
+  'cloud-security-trends',
+  'ja'
+); 

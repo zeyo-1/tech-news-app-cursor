@@ -19,7 +19,7 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { theme, setTheme } = useTheme()
-  const { user } = useSupabase()
+  const { user, loading } = useSupabase()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -52,7 +52,6 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   const handleSearchIconClick = () => {
     setIsSearchMode(true)
-    // 少し遅延を入れてフォーカスを設定（表示アニメーション後）
     setTimeout(() => {
       inputRef.current?.focus()
     }, 100)
@@ -192,24 +191,29 @@ export function Header({ onMenuClick }: HeaderProps) {
                     <span className="sr-only">テーマを切り替え</span>
                   </Button>
 
-                  {user ? (
+                  {!loading && (
                     <>
-                      <Button variant="ghost" size="icon">
-                        <Bell className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <User className="h-4 w-4" />
-                      </Button>
+                      {user ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0"
+                        >
+                          <User className="h-4 w-4" />
+                          <span className="sr-only">ユーザーメニュー</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          asChild
+                          className="shrink-0"
+                        >
+                          <Link href="/auth">
+                            ログイン
+                          </Link>
+                        </Button>
+                      )}
                     </>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" asChild>
-                        <Link href="/auth/login">ログイン</Link>
-                      </Button>
-                      <Button asChild>
-                        <Link href="/auth/signup">無料会員登録</Link>
-                      </Button>
-                    </div>
                   )}
                 </div>
               </div>

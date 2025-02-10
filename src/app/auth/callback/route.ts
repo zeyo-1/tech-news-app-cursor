@@ -7,7 +7,6 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const next = requestUrl.searchParams.get('next') || '/';
 
   if (code) {
     const cookieStore = cookies();
@@ -15,16 +14,14 @@ export async function GET(request: Request) {
     
     try {
       await supabase.auth.exchangeCodeForSession(code);
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
     } catch (error) {
-      console.error('Error in auth callback:', error);
-      return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent('認証エラーが発生しました')}`, requestUrl.origin)
-      );
+      console.error('Error exchanging code for session:', error);
     }
   }
 
-  return NextResponse.redirect(
-    new URL('/auth/login?error=code_not_found', requestUrl.origin)
-  );
+  // URL から code パラメータを削除
+  requestUrl.searchParams.delete('code');
+  
+  // ホームページにリダイレクト
+  return NextResponse.redirect(new URL('/', requestUrl.origin));
 }

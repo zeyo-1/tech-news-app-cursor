@@ -32,17 +32,20 @@ const RSS_FEEDS = [
   {
     url: 'https://gigazine.net/news/rss_2.0/',
     name: 'GIGAZINE',
-    allowsScraping: true
+    allowsScraping: true,
+    timeout: 30000
   },
   {
     url: 'https://rss.itmedia.co.jp/rss/2.0/news_technology.xml',
     name: 'ITmedia NEWS',
-    allowsScraping: false
+    allowsScraping: false,
+    timeout: 30000
   },
   {
     url: 'https://www.publickey1.jp/atom.xml',
     name: 'Publickey',
-    allowsScraping: false
+    allowsScraping: false,
+    timeout: 30000
   }
 ];
 
@@ -109,9 +112,9 @@ async function withRetry<T>(
   }
 ): Promise<T> {
   const {
-    maxRetries = 3,
-    baseDelay = 1000,
-    maxDelay = 10000,
+    maxRetries = 5,
+    baseDelay = 2000,
+    maxDelay = 20000,
     operationName
   } = options;
 
@@ -223,46 +226,69 @@ async function generateSummaryWithRetry(text: string): Promise<string> {
     return text.slice(0, 200) + '...';
   }
 
-  return await withRetry(
-    () => axios.post('https://api.deepseek.com/v1/chat/completions', {
-      model: "deepseek-chat",
-      messages: [
-        {
-          role: "system",
-          content: "あなたは技術記事の要約を生成する専門家です。与えられた記事を3-4文で簡潔に要約してください。"
-        },
-        {
-          role: "user",
-          content: processedText
+  try {
+    console.log('Attempting to connect to DeepSeek API...');
+    console.log('API Key exists:', !!process.env.DEEPSEEK_API_KEY);
+    
+    return await withRetry(
+      async () => {
+        try {
+          const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
+            model: "deepseek-chat",
+            messages: [
+              {
+                role: "system",
+                content: "あなたは技術記事の要約を生成する専門家です。与えられた記事を3-4文で簡潔に要約してください。"
+              },
+              {
+                role: "user",
+                content: processedText
+              }
+            ],
+            temperature: 0.3,
+            max_tokens: 200,
+            top_p: 0.1,
+          }, {
+            headers: {
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 30000,
+            maxBodyLength: 4000,
+            maxContentLength: 4000
+          });
+
+          console.log('DeepSeek API response status:', response.status);
+          
+          if (!response.data?.choices?.[0]?.message?.content) {
+            throw new ScraperError(
+              'Invalid response format from DeepSeek API',
+              ErrorCodes.API_ERROR
+            );
+          }
+          return response.data.choices[0].message.content;
+        } catch (error) {
+          if (axios.isAxiosError(error)) {
+            console.error('DeepSeek API Error:', {
+              status: error.response?.status,
+              data: error.response?.data,
+              message: error.message
+            });
+          }
+          throw error;
         }
-      ],
-      temperature: 0.3,
-      max_tokens: 200,
-      top_p: 0.1,
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        'Content-Type': 'application/json'
       },
-      timeout: 10000, // タイムアウトを10秒に短縮
-      maxBodyLength: 4000,
-      maxContentLength: 4000
-    }).then(response => {
-      if (!response.data?.choices?.[0]?.message?.content) {
-        throw new ScraperError(
-          'Invalid response format from DeepSeek API',
-          ErrorCodes.API_ERROR
-        );
+      {
+        operationName: 'Generating summary',
+        maxRetries: 3,
+        baseDelay: 10000,
+        maxDelay: 30000
       }
-      return response.data.choices[0].message.content;
-    }),
-    {
-      operationName: 'Generating summary',
-      maxRetries: 2,
-      baseDelay: 5000, // 初回リトライまでの待機時間を5秒に設定
-      maxDelay: 15000 // 最大待機時間を15秒に制限
-    }
-  );
+    );
+  } catch (error) {
+    console.error('Failed to generate summary:', error);
+    return text.slice(0, 200) + '...';
+  }
 }
 
 // 要約生成のメイン関数（キューを使用）
@@ -435,7 +461,7 @@ async function fetchFeedSafely(feed: typeof RSS_FEEDS[0]): Promise<Article[]> {
           'Accept': 'application/xml, application/rss+xml, text/xml',
           'User-Agent': 'Mozilla/5.0 (compatible; Tech News App/1.0;)'
         },
-        timeout: 10000
+        timeout: feed.timeout
       }),
       { 
         operationName: `Fetching ${feed.name} feed`,

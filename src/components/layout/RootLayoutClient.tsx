@@ -5,17 +5,22 @@ import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ThemeProvider } from 'next-themes';
 import { cn } from '@/lib/utils';
+import { usePathname } from 'next/navigation';
 
 interface RootLayoutClientProps {
   children: React.ReactNode;
 }
 
 export function RootLayoutClient({ children }: RootLayoutClientProps) {
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-
-  const handleMenuToggle = () => {
-    setIsSidebarExpanded(!isSidebarExpanded);
-  };
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  
+  // 管理者ページの場合は通常のヘッダーとサイドバーを表示しない
+  const isAdminPage = pathname?.startsWith('/admin');
+  
+  if (isAdminPage) {
+    return <>{children}</>;
+  }
 
   return (
     <ThemeProvider
@@ -25,14 +30,14 @@ export function RootLayoutClient({ children }: RootLayoutClientProps) {
       disableTransitionOnChange
     >
       <div className="relative min-h-screen">
-        <Header onMenuClick={handleMenuToggle} />
+        <Header onMenuClick={() => setSidebarOpen(!isSidebarOpen)} />
         <Sidebar
-          isExpanded={isSidebarExpanded}
-          onToggle={handleMenuToggle}
+          isExpanded={isSidebarOpen}
+          onToggle={() => setSidebarOpen(!isSidebarOpen)}
         />
         <main className={cn(
           'pt-14 transition-all duration-300',
-          isSidebarExpanded ? 'md:pl-64' : 'md:pl-[70px]'
+          isSidebarOpen ? 'md:pl-64' : 'md:pl-[70px]'
         )}>
           <div className="container py-8">
             {children}

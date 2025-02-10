@@ -1,40 +1,17 @@
 'use client'
 
-import { CacheProvider } from '@chakra-ui/next-js'
-import { ChakraProvider, ThemeConfig, extendTheme } from '@chakra-ui/react'
+import { ThemeProvider as NextThemesProvider } from 'next-themes'
+import { type ThemeProviderProps } from 'next-themes/dist/types'
 
-const config: ThemeConfig = {
-  initialColorMode: 'light',
-  useSystemColorMode: true,
-}
-
-const theme = extendTheme({
-  config,
-  styles: {
-    global: {
-      body: {
-        bg: 'gray.50',
-        color: 'gray.800',
-      },
-    },
-  },
-  colors: {
-    brand: {
-      50: '#f0f9ff',
-      100: '#e0f2fe',
-      500: '#0ea5e9',
-      600: '#0284c7',
-      700: '#0369a1',
-    },
-  },
-})
-
-export function Providers({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
-    <CacheProvider>
-      <ChakraProvider theme={theme}>
-        {children}
-      </ChakraProvider>
-    </CacheProvider>
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      {...props}
+    >
+      {children}
+    </NextThemesProvider>
   )
 } 

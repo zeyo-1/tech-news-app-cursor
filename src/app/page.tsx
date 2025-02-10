@@ -1,113 +1,130 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArticleCard } from '@/components/ArticleCard'
+import { Article } from '@/types/article'
 import { CategoryFilter } from '@/components/CategoryFilter'
 import { SortFilter } from '@/components/SortFilter'
-import { TagFilter } from '@/components/TagFilter'
-import type { Article } from '@/types/article'
-
-// テスト用の記事データ
-const testArticles: Article[] = [
-  {
-    title: 'TypeScript 5.4 Beta発表：より賢いタイプチェッキングと新しい構文機能',
-    url: 'https://example.com/typescript-5-4',
-    source_name: 'Tech Blog',
-    published_at: '2024-02-15T19:00:00Z',
-    summary: 'TypeScript 5.4のベータ版が発表されました。新バージョンでは、タイプチェッキングの改善や、新しい構文機能の追加など、開発者の生産性を向上させる機能が多数導入されています。',
-    thumbnail: 'https://picsum.photos/800/400',
-    language: 'ja',
-    category: 'programming'
-  },
-  {
-    title: 'OpenAIがGPT-4 Turboの改良版をリリース：より正確な応答と低レイテンシーを実現',
-    url: 'https://example.com/gpt4-turbo-update',
-    source_name: 'AI News',
-    published_at: '2024-02-15T00:30:00Z',
-    summary: 'OpenAIは、GPT-4 Turboの改良版をリリースしました。新バージョンでは、応答の正確性が向上し、レイテンシーが大幅に削減されています。また、長文処理の能力も改善されています。',
-    thumbnail: 'https://picsum.photos/800/400',
-    language: 'ja',
-    category: 'ai-ml'
-  },
-  {
-    title: 'Next.js 14.1がリリース：Turbopackの安定性向上とパフォーマンス最適化',
-    url: 'https://example.com/nextjs-14-1',
-    source_name: 'Dev News',
-    published_at: '2024-02-13T18:15:00Z',
-    summary: 'Vercelは、Next.js 14.1を正式にリリースしました。今回のアップデートでは、Turbopackの安定性が大幅に向上し、ビルド時間の短縮とパフォーマンスの最適化が実現されています。',
-    thumbnail: 'https://picsum.photos/800/400',
-    language: 'ja',
-    category: 'programming'
-  }
-]
+import type { SortOption } from '@/components/SortFilter'
+import { ArticleSkeletonGrid } from '@/components/ArticleSkeleton'
+import { ErrorMessage } from '@/components/ErrorMessage'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function Home() {
+  const [articles, setArticles] = useState<Article[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [selectedSort, setSelectedSort] = useState<'latest' | 'popular' | 'trending'>('latest')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedSort, setSelectedSort] = useState<SortOption>('latest')
+  const [error, setError] = useState<string | null>(null)
+  const supabase = createClientComponentClient()
 
+  // 記事を取得する関数
+  const fetchArticles = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('articles')
+        .select('*')
+        .order('published_at', { ascending: false })
+
+      if (error) throw error
+      setArticles(data || [])
+      setError(null)
+    } catch (err) {
+      setError('記事の取得に失敗しました')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // カテゴリー変更時の処理
   const handleCategoryChange = (category: string | null) => {
     setSelectedCategory(category)
   }
 
-  const handleSortChange = (sort: 'latest' | 'popular' | 'trending') => {
+  // ソート変更時の処理
+  const handleSortChange = (sort: SortOption) => {
     setSelectedSort(sort)
   }
 
-  const handleTagSelect = (tag: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
+  // 記事のフィルタリングとソート
+  const filteredAndSortedArticles = articles
+    .filter(article => {
+      const matchesCategory = !selectedCategory || article.category === selectedCategory
+      return matchesCategory
+    })
+    .sort((a, b) => {
+      switch (selectedSort) {
+        case 'latest':
+          return new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
+        case 'popular':
+          return (b.view_count || 0) - (a.view_count || 0)
+        case 'trending':
+          return (b.engagement_score || 0) - (a.engagement_score || 0)
+        default:
+          return 0
+      }
+    })
+
+  // コンポーネントのマウント時に記事を取得
+  useEffect(() => {
+    fetchArticles()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-col gap-4">
+          <div className="h-10 w-full animate-pulse rounded-lg bg-muted" />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-9 w-24 animate-pulse rounded-md bg-muted" />
+              ))}
+            </div>
+            <div className="flex gap-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-9 w-28 animate-pulse rounded-md bg-muted" />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <ArticleSkeletonGrid />
+      </div>
     )
   }
 
-  // カテゴリーでフィルタリング
-  const filteredArticles = testArticles.filter(article => {
-    if (!selectedCategory) return true
-    return article.category === selectedCategory
-  })
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <ErrorMessage
+          message={error}
+          onRetry={fetchArticles}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
       <div className="space-y-6">
-        <CategoryFilter
-          selectedCategory={selectedCategory}
-          onCategoryChange={handleCategoryChange}
-        />
-
         <div className="flex flex-wrap gap-4">
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            onCategoryChange={handleCategoryChange}
+          />
           <SortFilter
             value={selectedSort}
             onValueChange={handleSortChange}
           />
         </div>
 
-        <TagFilter
-          tags={[
-            { id: 'javascript', name: 'JavaScript' },
-            { id: 'typescript', name: 'TypeScript' },
-            { id: 'python', name: 'Python' },
-            { id: 'react', name: 'React' },
-            { id: 'nextjs', name: 'Next.js' },
-            { id: 'nodejs', name: 'Node.js' },
-            { id: 'aws', name: 'AWS' },
-            { id: 'docker', name: 'Docker' },
-            { id: 'kubernetes', name: 'Kubernetes' },
-            { id: 'github', name: 'GitHub' },
-            { id: 'chatgpt', name: 'ChatGPT' },
-            { id: 'llm', name: 'LLM' },
-            { id: 'web3', name: 'Web3' },
-            { id: 'blockchain', name: 'ブロックチェーン' }
-          ]}
-          selectedTags={selectedTags}
-          onTagSelect={handleTagSelect}
-        />
-
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredArticles.map((article) => (
+          {filteredAndSortedArticles.map((article) => (
             <ArticleCard
-              key={article.url}
+              key={article.source_url}
               article={article}
             />
           ))}
@@ -115,4 +132,4 @@ export default function Home() {
       </div>
     </div>
   )
-}
+} 

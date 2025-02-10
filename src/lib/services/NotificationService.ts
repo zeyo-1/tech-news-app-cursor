@@ -1,3 +1,10 @@
+import axios from 'axios';
+
+interface NotificationOptions {
+  color?: string;
+  fields?: Record<string, string | number>;
+}
+
 export class NotificationService {
   private webhookUrl: string;
 
@@ -5,109 +12,61 @@ export class NotificationService {
     this.webhookUrl = webhookUrl;
   }
 
-  async notifyError(error: Error, context: Record<string, unknown>): Promise<void> {
-    const message = {
-      blocks: [
-        {
-          type: "header",
-          text: {
-            type: "plain_text",
-            text: "🚨 エラーが発生しました",
-            emoji: true
-          }
-        },
-        {
-          type: "section",
-          fields: [
-            {
-              type: "mrkdwn",
-              text: `*エラー種別:*\n${error.name}`
-            },
-            {
-              type: "mrkdwn",
-              text: `*タイムスタンプ:*\n${new Date().toLocaleString('ja-JP')}`
-            }
-          ]
-        },
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `*エラーメッセージ:*\n\`\`\`${error.message}\`\`\``
-          }
-        },
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `*コンテキスト:*\n\`\`\`${JSON.stringify(context, null, 2)}\`\`\``
-          }
-        }
-      ]
-    };
-
+  private async sendToSlack(message: any) {
     try {
-      const response = await fetch(this.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(message)
-      });
-
-      if (!response.ok) {
-        console.error('Slack通知の送信に失敗しました:', response.statusText);
-      }
+      await axios.post(this.webhookUrl, message);
     } catch (error) {
-      console.error('Slack通知の送信中にエラーが発生しました:', error);
+      console.error('Failed to send Slack notification:', error);
+      throw error;
     }
   }
 
-  async notifySuccess(message: string, details?: Record<string, unknown>): Promise<void> {
-    const payload = {
-      blocks: [
-        {
-          type: "header",
-          text: {
-            type: "plain_text",
-            text: "✅ 処理が完了しました",
-            emoji: true
-          }
-        },
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: message
-          }
-        }
-      ]
-    };
+  async notifySuccess(message: string, data?: Record<string, any>) {
+    const fields = data ? Object.entries(data).map(([key, value]) => ({
+      title: key,
+      value: String(value),
+      short: true
+    })) : [];
 
-    if (details) {
-      payload.blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*詳細:*\n\`\`\`${JSON.stringify(details, null, 2)}\`\`\``
-        }
+    await this.sendToSlack({
+      attachments: [{
+        color: '#36a64f',
+        text: message,
+        fields,
+        footer: 'Tech News App',
+        ts: Math.floor(Date.now() / 1000)
+      }]
+    });
+  }
+
+  async notifyError(error: Error, context?: { context: string; stats?: any }) {
+    const fields = [];
+    
+    if (context?.context) {
+      fields.push({
+        title: 'Context',
+        value: context.context,
+        short: true
       });
     }
 
-    try {
-      const response = await fetch(this.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+    if (context?.stats) {
+      fields.push({
+        title: 'Stats',
+        value: JSON.stringify(context.stats, null, 2),
+        short: false
       });
-
-      if (!response.ok) {
-        console.error('Slack通知の送信に失敗しました:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Slack通知の送信中にエラーが発生しました:', error);
     }
+
+    await this.sendToSlack({
+      attachments: [{
+        color: '#ff0000',
+        title: 'エラーが発生しました',
+        text: error.message,
+        fields,
+        footer: 'Tech News App',
+        ts: Math.floor(Date.now() / 1000)
+      }]
+    });
   }
 } 

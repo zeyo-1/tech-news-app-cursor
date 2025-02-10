@@ -37,7 +37,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       {/* オーバーレイ（モバイル時のみ表示） */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:hidden"
           onClick={onClose}
         />
       )}
@@ -45,13 +45,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       {/* サイドバー */}
       <aside
         className={cn(
-          'fixed left-0 top-14 z-30 h-[calc(100vh-3.5rem)] border-r bg-background transition-all duration-300',
-          isOpen ? 'w-64' : 'w-[70px]',
-          'md:translate-x-0', // デスクトップでは常に表示
-          'transform',
-          !isOpen && 'md:w-[70px]', // 非展開時はアイコンのみ表示
-          'max-md:-translate-x-full', // モバイルでは非表示
-          isOpen && 'max-md:translate-x-0' // モバイルで展開時は表示
+          'fixed left-0 top-14 z-50 h-[calc(100vh-3.5rem)] w-[70px] border-r bg-background transition-all duration-300',
+          isOpen && 'w-64',
+          'md:z-30 md:translate-x-0', // デスクトップでは常に表示
+          'max-md:z-50', // モバイルでは最前面に表示
+          !isOpen && 'max-md:-translate-x-full', // モバイルかつ非表示時は左に隠す
         )}
       >
         <ScrollArea className="h-full">

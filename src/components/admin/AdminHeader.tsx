@@ -28,21 +28,21 @@ export default function AdminHeader({ onMenuClick, isSidebarOpen }: AdminHeaderP
 
         <Link href="/admin" className="flex items-center gap-2 shrink-0">
           <span className="text-xl font-bold">
-            <span className="hidden md:inline">Buzz Tech Now</span>
-            <span className="md:hidden">BTN</span>
+            <span className="hidden md:inline">Buzz Tech Now（管理画面）</span>
+            <span className="md:hidden">BTN（Admin）</span>
           </span>
         </Link>
 
-        <div className="flex flex-1 items-center justify-end gap-2 md:gap-4">
+        <div className="flex flex-1 items-center justify-end gap-4 pr-4">
           <Button
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="icon"
             asChild
-            className="hidden sm:flex"
+            className="h-8 w-8 hidden sm:inline-flex"
           >
             <Link href="/" target="_blank">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              サイトを表示
+              <ExternalLink className="h-4 w-4" />
+              <span className="sr-only">サイトを表示</span>
             </Link>
           </Button>
 
@@ -51,9 +51,9 @@ export default function AdminHeader({ onMenuClick, isSidebarOpen }: AdminHeaderP
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0"
+            className="h-8 w-8"
           >
-            <User className="h-5 w-5" />
+            <User className="h-4 w-4" />
             <span className="sr-only">ユーザーメニュー</span>
           </Button>
         </div>

@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Loader2, AlertTriangle, Search } from 'lucide-react';
 import {
   Pagination,
   PaginationContent,
@@ -31,20 +31,23 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ErrorLog {
   id: string;
   error_type: string;
-  message: string;
+  error_message: string;
   stack_trace: string;
   metadata: any;
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
   severity: 'error' | 'warning' | 'critical';
-  resolver?: {
-    email: string;
-  };
+  resolver: {
+    id: string;
+    name: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 const ITEMS_PER_PAGE = 20;
@@ -76,7 +79,7 @@ export default function ErrorLogsPage() {
         .select('*', { count: 'exact', head: true });
 
       if (searchQuery) {
-        countQuery = countQuery.or(`message.ilike.%${searchQuery}%,error_type.ilike.%${searchQuery}%`);
+        countQuery = countQuery.or(`error_message.ilike.%${searchQuery}%,error_type.ilike.%${searchQuery}%`);
       }
 
       if (selectedSeverity !== 'all') {
@@ -98,14 +101,22 @@ export default function ErrorLogsPage() {
       let query = supabase
         .from('error_logs')
         .select(`
-          *,
-          resolver:profiles(email)
+          id,
+          error_type,
+          error_message,
+          stack_trace,
+          metadata,
+          created_at,
+          resolved_at,
+          resolved_by,
+          severity,
+          resolver:profiles!error_logs_resolved_by_fkey(id, name, avatar_url)
         `)
         .order('created_at', { ascending: false })
         .range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1);
 
       if (searchQuery) {
-        query = query.or(`message.ilike.%${searchQuery}%,error_type.ilike.%${searchQuery}%`);
+        query = query.or(`error_message.ilike.%${searchQuery}%,error_type.ilike.%${searchQuery}%`);
       }
 
       if (selectedSeverity !== 'all') {
@@ -120,11 +131,30 @@ export default function ErrorLogsPage() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
-      setLogs(data || []);
+      if (error) {
+        console.error('Query error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
+
+      // データを適切な形式に変換
+      const formattedLogs = (data || []).map(log => ({
+        ...log,
+        resolver: Array.isArray(log.resolver) ? log.resolver[0] : log.resolver
+      }));
+      
+      setLogs(formattedLogs as ErrorLog[]);
     } catch (error) {
       console.error('Error fetching error logs:', error);
-      setError('エラーログの取得に失敗しました');
+      if (error instanceof Error) {
+        setError(`エラーログの取得に失敗しました: ${error.message}`);
+      } else {
+        setError('エラーログの取得に失敗しました');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -175,14 +205,6 @@ export default function ErrorLogsPage() {
     return range;
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[200px] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin" />
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="flex h-[200px] items-center justify-center text-destructive">
@@ -192,173 +214,186 @@ export default function ErrorLogsPage() {
   }
 
   return (
-    <div className="space-y-4 p-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold">エラーログ</h1>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertTriangle className="h-4 w-4" />
-            <span>未解決のエラー: {logs.filter(log => !log.resolved_at).length}件</span>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <CardTitle>エラーログ</CardTitle>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertTriangle className="h-4 w-4" />
+                <span>未解決のエラー: {logs.filter(log => !log.resolved_at).length}件</span>
+              </div>
+            </div>
+            <Button onClick={() => fetchLogs()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              更新
+            </Button>
           </div>
-        </div>
-        <Button onClick={() => fetchLogs()}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          更新
-        </Button>
-      </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="flex-1">
+              <Input
+                placeholder="エラーを検索..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="max-w-sm"
+              />
+            </div>
+            <Select
+              value={selectedSeverity}
+              onValueChange={(value) => {
+                setSelectedSeverity(value);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="重要度" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべて</SelectItem>
+                <SelectItem value="error">エラー</SelectItem>
+                <SelectItem value="warning">警告</SelectItem>
+                <SelectItem value="critical">重大</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedStatus}
+              onValueChange={(value) => {
+                setSelectedStatus(value);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="ステータス" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべて</SelectItem>
+                <SelectItem value="resolved">解決済み</SelectItem>
+                <SelectItem value="unresolved">未解決</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-      <div className="flex items-center space-x-4">
-        <div className="flex-1">
-          <Input
-            placeholder="エラーを検索..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="max-w-sm"
-          />
-        </div>
-        <Select
-          value={selectedSeverity}
-          onValueChange={(value) => {
-            setSelectedSeverity(value);
-            setCurrentPage(1);
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="重要度" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">すべて</SelectItem>
-            <SelectItem value="error">エラー</SelectItem>
-            <SelectItem value="warning">警告</SelectItem>
-            <SelectItem value="critical">重大</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={selectedStatus}
-          onValueChange={(value) => {
-            setSelectedStatus(value);
-            setCurrentPage(1);
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="ステータス" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">すべて</SelectItem>
-            <SelectItem value="resolved">解決済み</SelectItem>
-            <SelectItem value="unresolved">未解決</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>日時</TableHead>
-              <TableHead>種類</TableHead>
-              <TableHead>重要度</TableHead>
-              <TableHead>メッセージ</TableHead>
-              <TableHead>ステータス</TableHead>
-              <TableHead className="text-right">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {logs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center">
-                  エラーログが見つかりません
-                </TableCell>
-              </TableRow>
-            ) : (
-              logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="whitespace-nowrap">
-                    {format(new Date(log.created_at), 'yyyy/MM/dd HH:mm:ss', { locale: ja })}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {log.error_type}
-                  </TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${severityColors[log.severity]}`}>
-                      {log.severity}
-                    </span>
-                  </TableCell>
-                  <TableCell>{log.message}</TableCell>
-                  <TableCell>
-                    {log.resolved_at ? (
-                      <div className="text-sm">
-                        <Badge variant="secondary">解決済み</Badge>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {format(new Date(log.resolved_at), 'yyyy/MM/dd HH:mm', { locale: ja })}
-                          <br />
-                          {log.resolver?.email}
-                        </div>
-                      </div>
-                    ) : (
-                      <Badge>未解決</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {!log.resolved_at && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleResolve(log.id)}
-                      >
-                        解決済みにする
-                      </Button>
-                    )}
-                  </TableCell>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>日時</TableHead>
+                  <TableHead>種類</TableHead>
+                  <TableHead>重要度</TableHead>
+                  <TableHead>メッセージ</TableHead>
+                  <TableHead>ステータス</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                    </TableCell>
+                  </TableRow>
+                ) : logs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center">
+                      エラーログが見つかりません
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  logs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(log.created_at), 'yyyy/MM/dd HH:mm:ss', { locale: ja })}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {log.error_type}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${severityColors[log.severity]}`}>
+                          {log.severity}
+                        </span>
+                      </TableCell>
+                      <TableCell>{log.error_message}</TableCell>
+                      <TableCell>
+                        {log.resolved_at ? (
+                          <div className="text-sm">
+                            <Badge variant="secondary">解決済み</Badge>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {format(new Date(log.resolved_at), 'yyyy/MM/dd HH:mm', { locale: ja })}
+                              <br />
+                              {log.resolver?.name}
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge>未解決</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!log.resolved_at && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResolve(log.id)}
+                          >
+                            解決済みにする
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      {/* ページネーション */}
-      {!isLoading && logs.length > 0 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-              />
-            </PaginationItem>
-            
-            {getPageRange().map((page) => (
-              <PaginationItem key={page}>
-                <PaginationLink
-                  onClick={() => setCurrentPage(page)}
-                  isActive={page === currentPage}
-                >
-                  {page}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
+          {/* ページネーション */}
+          {!isLoading && logs.length > 0 && (
+            <div className="mt-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    />
+                  </PaginationItem>
+                  
+                  {getPageRange().map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={page === currentPage}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
 
-            <PaginationItem>
-              <PaginationNext
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
 
-      {/* 総件数の表示 */}
-      {!isLoading && (
-        <div className="text-sm text-muted-foreground text-center">
-          全{totalCount}件中 {(currentPage - 1) * ITEMS_PER_PAGE + 1}～
-          {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}件を表示
-        </div>
-      )}
+          {/* 総件数の表示 */}
+          {!isLoading && (
+            <div className="mt-4 text-sm text-muted-foreground text-center">
+              全{totalCount}件中 {(currentPage - 1) * ITEMS_PER_PAGE + 1}～
+              {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}件を表示
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 } 

@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Menu, ExternalLink, User } from 'lucide-react';
+import { Menu, ExternalLink, User, LogOut, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { ModeToggle } from '@/components/mode-toggle';
 import {
@@ -10,6 +10,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
@@ -17,6 +26,18 @@ interface AdminHeaderProps {
 }
 
 export default function AdminHeader({ onMenuClick, isSidebarOpen }: AdminHeaderProps) {
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.push('/auth');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={50}>
       <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -62,8 +83,8 @@ export default function AdminHeader({ onMenuClick, isSidebarOpen }: AdminHeaderP
 
             <ModeToggle />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -72,11 +93,24 @@ export default function AdminHeader({ onMenuClick, isSidebarOpen }: AdminHeaderP
                   <User className="h-4 w-4" />
                   <span className="sr-only">ユーザーメニュー</span>
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>ユーザーメニュー</p>
-              </TooltipContent>
-            </Tooltip>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/settings" className="flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>管理者設定</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>ログアウト</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

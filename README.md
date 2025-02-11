@@ -9,37 +9,50 @@
 ### 記事関連テーブル
 - `articles`: メインの記事テーブル（タイトル、内容、メタ情報など）
 - `article_summaries`: 記事要約テーブル
-- `news`: RSSフィードから取得したニュース記事
+- `article_analytics`: 記事のアクセス分析データ
 - `article_likes`: 記事のいいね情報
+- `news`: RSSフィードから取得したニュース記事
+- `news_categories`: ニュースとカテゴリーの関連付け
 - `read_later`: 後で読む記事の管理
 - `view_history`: 記事の閲覧履歴
+- `page_views`: ページビュー統計
 
 ### カテゴリー関連テーブル
 - `categories`: メインカテゴリー
 - `subcategories`: サブカテゴリー
-- `news_categories`: ニュースとカテゴリーの関連付け
 - `user_category_preferences`: ユーザーのカテゴリー設定
-
-### コメント関連テーブル
-- `comments`: 記事へのコメント
-- `comment_likes`: コメントのいいね
-- `comment_reports`: コメントの報告
-- `comment_edit_history`: コメント編集履歴
 
 ### ユーザー関連テーブル
 - `profiles`: ユーザープロフィール（管理者フラグ含む）
 - `users`: ユーザー基本情報
 - `user_settings`: ユーザーの一般設定（テーマ設定、言語設定など）
+- `user_sessions`: ユーザーセッション情報
 
 ### 通知関連テーブル
 - `notification_settings`: ユーザーごとの通知設定
 - `notification_history`: 送信された通知の履歴
+- `notification_queue`: 通知送信キュー
 - `notification_channels`: 通知チャンネル（メール、Slack、LINE）の設定
+- `notification_templates`: 通知テンプレート
 - `keywords_watch`: ユーザーが監視したいキーワード
 
 ### フィードバック関連テーブル
 - `feedback`: ユーザーからのフィードバック
 - `feature_requests`: 機能リクエスト
+
+### ログ・監視関連テーブル
+- `activity_logs`: システムの操作ログ（月次パーティション）
+  - `activity_logs_y2024m01`: 2024年1月のログ
+  - `activity_logs_y2024m02`: 2024年2月のログ
+- `error_logs`: システムエラーログ
+- `system_logs`: 一般システムログ
+- `api_usage_logs`: API使用状況ログ
+- `health`: システムヘルスチェック情報
+
+### システム設定・管理テーブル
+- `system_settings`: システム全体の設定
+- `batch_jobs`: バッチ処理ジョブ管理
+- `job_executions`: ジョブ実行履歴
 
 ## ユーザー種別と機能要件
 
@@ -131,11 +144,13 @@ npm run dev
 - [x] キャッシュシステム
 - [x] Cron Job による定期実行
 - [x] 管理者ダッシュボードの基本構造
-- [ ] 管理者ダッシュボードの各機能
+- [x] アクティビティログ機能
+- [x] エラーログ機能
+- [ ] バッチ処理管理機能
 - [ ] ユーザー認証システム（実装中）
 - [ ] プロフィール管理機能
 - [ ] お気に入り機能
-- [ ] 後で見る機能
+- [ ] 後で読む機能
 - [ ] 閲覧履歴機能
 - [ ] メール通知機能（予定）
 - [ ] Slack/LINE連携（予定）

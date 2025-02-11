@@ -80,7 +80,7 @@ export default function AdminDashboard() {
       // アクティビティログを取得（最新10件）
       const { data: activityLogs } = await supabase
         .from('activity_logs')
-        .select('*')
+        .select('id, action, details, created_at')
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -97,7 +97,12 @@ export default function AdminDashboard() {
         lastUpdated: lastArticle?.created_at || null,
         errorCount: errorCount || 0,
         systemStatus,
-        activityLogs: activityLogs || [],
+        activityLogs: activityLogs?.map(log => ({
+          id: log.id,
+          action: log.action,
+          details: log.details,
+          timestamp: log.created_at
+        })) || [],
       });
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -277,17 +282,11 @@ export default function AdminDashboard() {
               ) : stats.activityLogs.length > 0 ? (
                 <div className="space-y-4">
                   {stats.activityLogs.map((log) => (
-                    <div key={log.id} className="flex items-start space-x-4">
-                      <div className="rounded-full bg-primary/10 p-2">
-                        <ActivityIcon className="h-4 w-4" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">{log.action}</p>
-                        <p className="text-sm text-muted-foreground">{log.details}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(log.timestamp), 'M/d HH:mm:ss', { locale: ja })}
-                        </p>
-                      </div>
+                    <div key={log.id} className="border-b pb-4 last:border-0 last:pb-0">
+                      <p className="text-sm text-muted-foreground">{log.details}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(log.timestamp), 'M/d HH:mm:ss', { locale: ja })}
+                      </p>
                     </div>
                   ))}
                 </div>

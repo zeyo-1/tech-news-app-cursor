@@ -24,6 +24,7 @@ export interface Article {
   deleted_at?: string;
   importance_score?: number;
   last_scraped_at?: string;
+  engagement_score?: number;
 }
 
 export interface Tag {

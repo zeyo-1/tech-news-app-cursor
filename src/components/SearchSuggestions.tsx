@@ -12,6 +12,7 @@ interface SearchSuggestionsProps {
 }
 
 export function SearchSuggestions({
+  query,
   recentSearches,
   trendingSearches,
   onSelect,
@@ -23,6 +24,18 @@ export function SearchSuggestions({
     <div className="absolute top-full left-0 mt-1">
       <div className="min-w-[280px] max-w-[min(100vw-24px,600px)] rounded-lg border bg-background shadow-lg">
         <div className="py-2">
+          {query && (
+            <div className="mb-2">
+              <div className="px-3 mb-1.5 text-xs font-medium text-muted-foreground">検索候補</div>
+              <Button
+                variant="ghost"
+                className="w-full h-10 px-3 justify-start gap-3 text-sm hover:bg-accent rounded-none"
+                onClick={() => onSelect(query)}
+              >
+                <span className="truncate max-w-[520px]">{query}</span>
+              </Button>
+            </div>
+          )}
           {recentSearches.length > 0 && (
             <div className="mb-2">
               <div className="px-3 mb-1.5 text-xs font-medium text-muted-foreground">最近の検索</div>

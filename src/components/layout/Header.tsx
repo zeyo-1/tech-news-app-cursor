@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, Search, Sun, Moon, Bell, User, ArrowLeft } from 'lucide-react'
+import { Menu, Search, Sun, Moon, Bell, User, LogOut, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useTheme } from 'next-themes'
@@ -18,243 +18,193 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface HeaderProps {
   onMenuClick: () => void
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { theme, setTheme } = useTheme()
-  const { user, loading } = useSupabase()
-  const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState('')
+  const [query, setQuery] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [isSearchMode, setIsSearchMode] = useState(false)
-  const { searchHistory, addToHistory } = useSearchHistory()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const { theme, setTheme } = useTheme()
+  const { searchHistory, addToHistory } = useSearchHistory()
+  const router = useRouter()
+  const supabase = createClientComponentClient();
 
-  // トレンドキーワードの例（実際にはAPIから取得するなど）
-  const trendingSearches = [
-    'ChatGPT-5',
-    'Next.js 14',
-    'React Server Components',
-    'AI開発',
-    'TypeScript 5.4'
-  ]
+  // セッション状態の確認
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    };
+
+    checkSession();
+
+    // セッション状態の変更を監視
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.push('/auth');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  const handleSearch = (query: string) => {
+    if (!query.trim()) return
+    addToHistory(query)
+    setShowSuggestions(false)
+    router.push(`/search?q=${encodeURIComponent(query)}`)
+  }
+
+  const handleSearchIconClick = () => {
+    if (query.trim()) {
+      handleSearch(query)
+    }
+  }
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light')
+  }
 
   useClickAway(searchRef, () => {
     setShowSuggestions(false)
   })
 
-  const handleSearch = (query: string) => {
-    if (!query.trim()) return
-    addToHistory(query)
-    setSearchQuery(query)
-    setShowSuggestions(false)
-    setIsSearchMode(false)
-    router.push(`/search?q=${encodeURIComponent(query)}`)
-  }
-
-  const handleSearchIconClick = () => {
-    setIsSearchMode(true)
-    setTimeout(() => {
-      inputRef.current?.focus()
-    }, 100)
-  }
-
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
-  };
-
   return (
     <TooltipProvider delayDuration={50}>
-      <header className="fixed top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14">
-          <div className="flex w-full">
-            {isSearchMode ? (
-              // 検索モード時のレイアウト
-              <div className="flex w-full items-center gap-2 px-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsSearchMode(false)}
-                  className="shrink-0"
-                >
-                  <ArrowLeft className="h-6 w-6" />
-                  <span className="sr-only">検索を閉じる</span>
-                </Button>
-                <div className="flex-1" ref={searchRef}>
-                  <div className="relative">
-                    <Input
-                      ref={inputRef}
-                      type="search"
-                      placeholder="記事を検索..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onFocus={() => setShowSuggestions(true)}
-                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement> & { isComposing: boolean }) => {
-                        if (e.isComposing || e.keyCode === 229) return
-                        if (e.key === 'Enter') handleSearch(searchQuery)
-                      }}
-                      className="w-full bg-muted pr-12 focus-visible:ring-1"
-                    />
-                    <Button
-                      type="submit"
-                      size="icon"
-                      variant="ghost"
-                      className="absolute right-1 top-1 h-7 w-8 hover:bg-accent/50"
-                      onClick={() => handleSearch(searchQuery)}
-                    >
-                      <Search className="h-4 w-4" />
-                      <span className="sr-only">検索</span>
-                    </Button>
-                    <SearchSuggestions
-                      query={searchQuery}
-                      recentSearches={searchHistory}
-                      trendingSearches={trendingSearches}
-                      onSelect={handleSearch}
-                      visible={showSuggestions}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              // 通常モード時のレイアウト
-              <>
-                <div className="shrink-0 w-[70px] h-full">
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-full items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMenuClick}
+            className="h-[48px] w-[48px] flex items-center justify-center rounded-lg hover:bg-accent"
+          >
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">メニューを開く</span>
+          </Button>
+
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-xl font-bold">Buzz Tech Now</span>
+          </Link>
+
+          <div className="relative flex-1" ref={searchRef}>
+            <div className="relative max-w-lg">
+              <Input
+                type="search"
+                placeholder="検索..."
+                className="pr-10"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setShowSuggestions(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch(query)
+                  }
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={handleSearchIconClick}
+              >
+                <Search className="h-4 w-4" />
+                <span className="sr-only">検索</span>
+              </Button>
+            </div>
+
+            <SearchSuggestions
+              query={query}
+              recentSearches={searchHistory}
+              trendingSearches={[]}
+              onSelect={handleSearch}
+              visible={showSuggestions}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-8 w-8"
+            >
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">テーマを切り替える</span>
+            </Button>
+
+            {isLoggedIn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={onMenuClick}
-                    className="h-full w-full flex items-center justify-center rounded-none hover:bg-accent"
+                    className="h-8 w-8"
                   >
-                    <Menu className="h-6 w-6" />
-                    <span className="sr-only">メニューを開く</span>
+                    <User className="h-4 w-4" />
+                    <span className="sr-only">ユーザーメニュー</span>
                   </Button>
-                </div>
-
-                <div className="flex-1 flex items-center px-4 min-w-0 max-w-[1720px] mx-auto">
-                  <Link href="/" className="flex items-center gap-2 shrink-0">
-                    <span className="text-xl font-bold">
-                      <span className="hidden md:inline">Buzz Tech Now</span>
-                      <span className="md:hidden">BTN</span>
-                    </span>
-                  </Link>
-
-                  <div className="flex flex-1 items-center gap-4 min-w-0 ml-8">
-                    <div className={cn(
-                      "w-full max-w-[580px] mx-auto",
-                      "hidden sm:block", // sm以上で表示
-                    )} ref={searchRef}>
-                      <div className="relative">
-                        <Input
-                          ref={inputRef}
-                          type="search"
-                          placeholder="記事を検索..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          onFocus={() => setShowSuggestions(true)}
-                          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement> & { isComposing: boolean }) => {
-                            if (e.isComposing || e.keyCode === 229) return
-                            if (e.key === 'Enter') handleSearch(searchQuery)
-                          }}
-                          className="w-full bg-muted pr-12 focus-visible:ring-1"
-                        />
-                        <Button
-                          type="submit"
-                          size="icon"
-                          variant="ghost"
-                          className="absolute right-1 top-1 h-7 w-8 hover:bg-accent/50"
-                          onClick={() => handleSearch(searchQuery)}
-                        >
-                          <Search className="h-4 w-4" />
-                          <span className="sr-only">検索</span>
-                        </Button>
-                        <SearchSuggestions
-                          query={searchQuery}
-                          recentSearches={searchHistory}
-                          trendingSearches={trendingSearches}
-                          onSelect={handleSearch}
-                          visible={showSuggestions}
-                        />
-                      </div>
-                    </div>
-
-                    {/* モバイル用検索アイコン */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleSearchIconClick}
-                          className="sm:hidden"
-                        >
-                          <Search className="h-5 w-5" />
-                          <span className="sr-only">検索</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>検索</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={toggleTheme}
-                          className="h-8 w-8"
-                        >
-                          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                          <span className="sr-only">テーマを切り替える</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{theme === 'light' ? 'ダークモードに切り替え' : 'ライトモードに切り替え'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {!loading && (
-                      <>
-                        {user ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
-                                <User className="h-4 w-4" />
-                                <span className="sr-only">ユーザーメニュー</span>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>ユーザーメニュー</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            asChild
-                            className="shrink-0"
-                          >
-                            <Link href="/auth">
-                              ログイン
-                            </Link>
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>プロフィール</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>設定</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>ログアウト</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                variant="ghost"
+                asChild
+                className="gap-2"
+              >
+                <Link href="/auth">
+                  <User className="h-4 w-4" />
+                  <span>ログイン</span>
+                </Link>
+              </Button>
             )}
           </div>
         </div>
       </header>
     </TooltipProvider>
-  );
+  )
 } 

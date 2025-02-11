@@ -13,6 +13,8 @@ import {
   Home,
   ScrollText,
   PlaySquare,
+  AlertCircle,
+  Activity,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -29,7 +31,16 @@ const navigation = [
   { name: '分析', href: '/admin/analytics', icon: BarChart, shortLabel: '分析' },
   { name: '通知設定', href: '/admin/notifications', icon: Bell, shortLabel: '通知' },
   { name: 'システム設定', href: '/admin/settings', icon: Settings, shortLabel: '設定' },
-  { name: 'ログ管理', href: '/admin/logs', icon: ScrollText, shortLabel: 'ログ' },
+  {
+    name: 'ログ管理',
+    href: '/admin/logs',
+    icon: ScrollText,
+    shortLabel: 'ログ',
+    subItems: [
+      { name: 'アクティビティログ', href: '/admin/logs', icon: Activity },
+      { name: 'エラーログ', href: '/admin/logs/error', icon: AlertCircle },
+    ]
+  },
   { name: 'バッチ管理', href: '/admin/batch', icon: PlaySquare, shortLabel: 'バッチ' },
 ];
 
@@ -64,31 +75,49 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 : pathname?.startsWith(item.href);
 
               return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    'group flex items-center rounded-lg transition-colors hover:bg-accent',
-                    isActive && 'bg-accent',
-                    isOpen
-                      ? 'h-[48px] gap-4 px-3 mx-3'
-                      : 'h-[48px] flex-col justify-center items-center mx-[11px]'
+                <div key={item.name}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'group flex items-center rounded-lg transition-colors hover:bg-accent',
+                      isActive && 'bg-accent',
+                      isOpen
+                        ? 'h-[48px] gap-4 px-3 mx-3'
+                        : 'h-[48px] flex-col justify-center items-center mx-[11px]'
+                    )}
+                  >
+                    <item.icon className={cn(
+                      'shrink-0',
+                      isOpen ? 'h-5 w-5' : 'h-5 w-5'
+                    )} />
+                    {isOpen ? (
+                      <span className="text-sm font-medium">
+                        {item.name}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-center whitespace-nowrap">
+                        {item.shortLabel}
+                      </span>
+                    )}
+                  </Link>
+                  {isOpen && item.subItems && (
+                    <div className="ml-12 mt-1 space-y-1">
+                      {item.subItems.map((subItem) => (
+                        <Link
+                          key={subItem.href}
+                          href={subItem.href}
+                          className={cn(
+                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent',
+                            pathname === subItem.href && 'bg-accent'
+                          )}
+                        >
+                          <subItem.icon className="h-4 w-4" />
+                          <span>{subItem.name}</span>
+                        </Link>
+                      ))}
+                    </div>
                   )}
-                >
-                  <item.icon className={cn(
-                    'shrink-0',
-                    isOpen ? 'h-5 w-5' : 'h-5 w-5'
-                  )} />
-                  {isOpen ? (
-                    <span className="text-sm font-medium">
-                      {item.name}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-center whitespace-nowrap">
-                      {item.shortLabel}
-                    </span>
-                  )}
-                </Link>
+                </div>
               );
             })}
           </nav>

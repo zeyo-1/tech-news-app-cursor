@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArticleCard } from '@/components/ArticleCard'
+import { ArticleCard } from '@/components/articles/ArticleCard'
 import { Article } from '@/types/article'
 import { CategoryFilter } from '@/components/CategoryFilter'
 import { SortFilter } from '@/components/SortFilter'
